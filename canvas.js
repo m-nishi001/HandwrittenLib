@@ -3,12 +3,12 @@ const DEFAULT_LINE_COLOR = "#FFFFFF";
 const DEFAULT_INVERT_LINE_COLOR = "#000000";
 const DEFAULT_CHARACTER_COLOR = "#FFFFFF";
 const DEFAULT_INVERT_CHARACTER_COLOR = "#000000";
-const DEFAULT_FILLCOLOR = "#008030";
+const DEFAULT_FILLCOLOR = "#008080";
 const DEFAULT_OVER_FILLCOLOR = "#FFFFFF";
 const DEFAULT_LINE_WIDTH = 1;
 const DEFAULT_CHARACTER_WIDTH = 1;
-const DEFAULT_HORIZONTAL_MARGIN = 15;
-const DEFAULT_VERTICAL_MARGIN = 15;
+// const DEFAULT_HORIZONTAL_MARGIN = 15;
+// const DEFAULT_VERTICAL_MARGIN = 15;
 const DEFAULT_CHARACTER_FONT = 'serif';
 const DEFAULT_COLOR_LIST = ['ffc0cb', '#ffa500', '#7fffd4', '#000000'];
 const DEFAULT_WIDTH_LIST = [10, 15, 20, 25];
@@ -37,7 +37,7 @@ function init(obj) {
     let contentContainer = new createjs.Container();
     let contents = obj.btn == null ? defaultBtnPropertyList : obj.btn;
     // let contentsCount = contents.length;
-    let contentsCount = 3;
+    let contentsCount = 8;
 
     for(let i = 0; i < contentsCount; i++){
         // 作成するコンテンツのタイプを取得
@@ -57,7 +57,7 @@ function init(obj) {
             content = drawBtn(contents[i]);
         }else if(type === 'popBtn'){
             // ポップアップボタンの場合
-            // content = drawPopBtn(contents[i]);
+            content = drawSpeechBalloons(contents[i]);
         }
 
         contentContainer.addChild(content);
@@ -69,13 +69,14 @@ function init(obj) {
     createjs.Ticker.timingMode = createjs.Ticker.RAF;
     createjs.Ticker.addEventListener("tick", onTick);
     function onTick() {
-    stage.update(); // Stageの描画を更新
+      stage.update(); // Stageの描画を更新
     }
 
     // ------------------------------------------------
     // 共通変数（デフォルト値）
     // ------------------------------------------------
     
+    var defaultHorizontalMargin, defaultVerticalMargin;
     var defaultLineColor, defaultFillColor, defaultCharacterColor, defaultOverFillColor;
     var defaultLineWidth, defaultCharacterWidth, defaultShapeSize, defaultButtonHeight, defaultButtonWidth;
     var defaultFont, defaultFontSize;
@@ -84,28 +85,42 @@ function init(obj) {
     var defaultBtnPropertyList;
 
     // ------------------------------------------------
+    // 共通変数（動的変更値）
+    // ------------------------------------------------
+    var penWidth, eraserWidth;
+    var penColor;
+    var popContainer;
+
+    // ------------------------------------------------
     // 初期化処理
     // ------------------------------------------------
     
     /** デフォルト値を設定 */
     function initializeDefault(cw, ch){
+        // 余白算出
+        defaultHorizontalMargin = cw * 0.01;
+        defaultVerticalMargin = ch * 0.02;
+        // 各値算出
+        defaultButtonHeight = Math.min(cw, ch) * 0.1;
+        defaultButtonWidth = Math.min(cw, ch) * 0.1;
+        defaultShapeSize = Math.min(cw, ch) * 0.1;
+        defaultFontSize = Math.min(cw, ch) * 0.07;
+
         defaultLineColor = DEFAULT_LINE_COLOR;
         defaultFillColor = DEFAULT_FILLCOLOR;
         defaultCharacterColor = DEFAULT_CHARACTER_COLOR;
         defaultLineWidth = DEFAULT_LINE_WIDTH;
         defaultCharacterWidth = DEFAULT_CHARACTER_WIDTH;
-        defaultButtonHeight = Math.min(cw, ch) * 0.1;
-        defaultButtonWidth = Math.min(cw, ch) * 0.1;
-        defaultShapeSize = Math.min(cw, ch) * 0.1;
         defaultFont = DEFAULT_CHARACTER_FONT;
-        defaultFontSize = Math.min(cw, ch) * 0.07;
         defaultOverFillColor = DEFAULT_OVER_FILLCOLOR;
         defaultColorList = DEFAULT_COLOR_LIST;
         defaultPenWidthList = DEFAULT_WIDTH_LIST;
         defaultEraserWidthList = DEFAULT_WIDTH_LIST;
         defaultBtnPropertyList = [];
 
-        console.log("キャンバス幅 : " + cw + " キャンバス高さ : " + ch);
+        penWidth = defaultPenWidthList[0];
+        eraserWidth = defaultEraserWidthList[0];
+        penColor = defaultColorList[0];
 
         let bgProperty = {
             'type': 'rect',
@@ -115,7 +130,7 @@ function init(obj) {
             'h': stage.canvas.height,
             'lineColor': DEFAULT_LINE_COLOR,
             'lineWidth': DEFAULT_LINE_WIDTH,
-            'fillColor': '#008080'
+            'fillColor': defaultFillColor
         }
         defaultBtnPropertyList.push(bgProperty);
 
@@ -125,89 +140,171 @@ function init(obj) {
         let date = today.getDate();
         dateProperty = {
             'type': 'text',
-            'x': cw * 0.9 + DEFAULT_HORIZONTAL_MARGIN,
+            'x': cw * 0.9 + defaultHorizontalMargin,
             'y': ch * 0.02,
             'h': defaultButtonHeight,
             'w': defaultButtonWidth,
             'text': year + '年' + month + '月' + date + '日',
             'textColor': defaultCharacterColor,
             'textFont': defaultFont,
-            'textSize': defaultFontSize,
+            'textSize': defaultFontSize
         }
         defaultBtnPropertyList.push(dateProperty);
 
+        let penObjProperty = {
+            'x': defaultButtonWidth/2,
+            'y': defaultButtonHeight/2 + (ch * 0.04)/2,
+            'h': ch * 0.04,
+            'w': cw * 0.01,
+            'lineColor': 'black',
+            'lineWidth': 1,
+            'bodyHeight': ch * 0.025,
+            'bodyColor': 'white',
+            'edgeColor': penColor
+        }   
         penProperty = {
             'type': 'btn',
-            'x': cw * 0.01 + DEFAULT_HORIZONTAL_MARGIN,
-            'y': ch - ch * 0.1,
+            'x': cw * 0.04 + defaultHorizontalMargin,
+            'y': ch - ch * 0.13 - defaultVerticalMargin,
             'h': defaultButtonHeight,
             'w': defaultButtonWidth,
             'lineColor': defaultLineColor,
             'lineWidth': defaultLineWidth,
             'roundWidth': 2,
             'roundHeight': 2,
-            'normalFillColor': defaultFillColor,
-            'overFillColor': defaultOverFillColor
+            'normalFillColor': bgProperty.fillColor,
+            'overFillColor': defaultOverFillColor,
+            'normalInsideObj': drawPen(penObjProperty)
             // 'penKinds': 
         }
         defaultBtnPropertyList.push(penProperty);
 
+        let colorPopProperty = {
+            'x': penProperty.x + penProperty.w + defaultHorizontalMargin,
+            'y': penProperty.y - defaultShapeSize * defaultColorList.length - defaultVerticalMargin * (defaultColorList.length + 3),
+            'w': defaultButtonWidth,
+            'h': defaultShapeSize * defaultColorList.length + defaultVerticalMargin * (defaultColorList.length + 1),
+            'lineWidth': defaultLineWidth,
+            'lineColor': defaultLineColor,
+            'roundWidth': 2,
+            'roundHeight': 2,
+            'balloonsFromX': penProperty.x + penProperty.w + defaultHorizontalMargin + defaultButtonWidth/2,
+            'balloonsFromY': penProperty.y - defaultVerticalMargin * 2,
+            'balloonsToX': penProperty.x + penProperty.w + defaultHorizontalMargin + defaultButtonWidth/2,
+            'balloonsToY': penProperty.y,
+            'balloonsWidth': 15,
+            'fillColor': defaultFillColor,
+            'colorList': defaultColorList
+        }
         colorProperty = {
-            'type': 'btn',
-            'x': penProperty.x + penProperty.w + DEFAULT_HORIZONTAL_MARGIN,
-            'y': penProperty.h,
+            'type': 'roundRect',
+            'x': penProperty.x + penProperty.w + defaultHorizontalMargin,
+            'y': penProperty.y,
             'h': defaultShapeSize,
             'w': defaultShapeSize,
-            'colorList': defaultColorList
+            'lineColor': defaultLineColor,
+            'lineWidth': defaultLineWidth,
+            'roundWidth': 2,
+            'roundHeight': 2,
+            'fillColor': penColor,
+            'isPopEvent': true,
+            'popEventProperty': colorPopProperty
         }
         defaultBtnPropertyList.push(colorProperty);
 
+        let subProperty = {
+            'x': colorProperty.x + colorProperty.w + defaultHorizontalMargin + defaultLineWidth,
+            'y': penProperty.y + defaultShapeSize/2 - penWidth/2,
+            'h': penWidth,
+            'w': defaultShapeSize - defaultLineWidth*2,
+            'lineWidth': defaultLineWidth,
+            'lineColor': 'blac',
+            'fillColor': penColor
+        }
         widthProperty = {
-            'type': 'btn',
-            'x': penProperty.x + penProperty.w + DEFAULT_HORIZONTAL_MARGIN,
-            'y': penProperty.h,
-            'h': defaultPenWidthList[0],
+            'type': 'roundRect',
+            'x': colorProperty.x + colorProperty.w + defaultHorizontalMargin,
+            'y': penProperty.y,
+            'h': defaultShapeSize,
             'w': defaultShapeSize,
-            'widthList': defaultPenWidthList
+            'lineColor': defaultLineColor,
+            'lineWidth': defaultLineWidth,
+            'roundWidth': 2,
+            'roundHeight': 2,
+            'fillColor': defaultFillColor,
+            'addShpaeObj': drawRect(subProperty),
+            'colorList': defaultColorList
         }
         defaultBtnPropertyList.push(widthProperty);
 
         toolAreaProperty = {
-            'type': 'shape',
-            'x': penProperty.x + DEFAULT_HORIZONTAL_MARGIN,
-            'y': penProperty.y - DEFAULT_VERTICAL_MARGIN,
-            'w': penProperty.w + colorProperty.w + widthProperty.w + DEFAULT_HORIZONTAL_MARGIN * 4,
-            'h': Math.max(penProperty.h, colorProperty.h, widthProperty.h) + DEFAULT_VERTICAL_MARGIN,
+            'type': 'roundRect',
+            'x': penProperty.x - defaultHorizontalMargin,
+            'y': penProperty.y - defaultVerticalMargin,
+            'w': penProperty.w + colorProperty.w + widthProperty.w + defaultHorizontalMargin * 4,
+            'h': Math.max(penProperty.h, colorProperty.h, widthProperty.h) + defaultVerticalMargin * 2,
             'lineWidth': defaultLineWidth,
             'lineColor': defaultLineColor,
+            'roundWidth': 2,
+            'roundHeight': 2,
             'fillColor': null
         }
         defaultBtnPropertyList.push(toolAreaProperty);
 
         eraserProperty = {
             'type': 'btn',
-            'x': cw * 0.1,
-            'y': penProperty.h,
+            'x': cw * 0.4,
+            'y': penProperty.y,
             'w': defaultButtonWidth,
             'h': defaultButtonHeight,
             'lineWidth': defaultLineWidth,
             'lineColor': defaultLineColor,
+            'roundWidth': 2,
+            'roundHeight': 2,
             'normalFillColor': defaultFillColor,
             'overFillColor': defaultOverFillColor,
             'eraserWidthList': defaultEraserWidthList
         }
         defaultBtnPropertyList.push(eraserProperty);
+        
+        // -----------
 
         saveProperty = {
+            'type': 'popBtn',
+            'x': eraserProperty.x + eraserProperty.w + defaultHorizontalMargin,
+            'y': penProperty.y - defaultButtonHeight - 20,
+            'w': defaultButtonWidth,
+            'h': defaultButtonHeight,
+            'lineWidth': defaultLineWidth,
+            'lineColor': 'black',
+            'roundWidth': 2,
+            'roundHeight': 2,
+            'balloonsFromX': eraserProperty.x + eraserProperty.w + defaultHorizontalMargin + defaultButtonWidth/2,
+            'balloonsFromY': penProperty.y - 20,
+            'balloonsToX': eraserProperty.x + eraserProperty.w + defaultHorizontalMargin + defaultButtonWidth/2,
+            'balloonsToY': penProperty.y + 10,
+            'balloonsWidth': 15,
+            'normalFillColor': defaultFillColor,
+            'overFillColor': defaultOverFillColor,
+            'eraserWidthList': defaultEraserWidthList
+        }
+        defaultBtnPropertyList.push(saveProperty);
+
+
+        // ------------
+        saveProperty = {
             'type': 'btn',
-            'x': eraserProperty + DEFAULT_HORIZONTAL_MARGIN,
-            'y': penProperty.h,
+            'x': eraserProperty.x + eraserProperty.w + defaultHorizontalMargin,
+            'y': penProperty.y,
             'w': defaultButtonWidth,
             'h': defaultButtonHeight,
             'lineWidth': defaultLineWidth,
             'lineColor': defaultLineColor,
+            'roundWidth': 2,
+            'roundHeight': 2,
             'normalFillColor': defaultFillColor,
-            'overFillColor': defaultOverFillColor
+            'overFillColor': defaultOverFillColor,
+            'eraserWidthList': defaultEraserWidthList
         }
         defaultBtnPropertyList.push(saveProperty);
 
@@ -226,7 +323,7 @@ function init(obj) {
 
         rightProperty = {
             'type': 'btn',
-            'x': leftProperty + DEFAULT_HORIZONTAL_MARGIN,
+            'x': leftProperty + defaultHorizontalMargin,
             'y': penProperty.h,
             'w': defaultButtonWidth,
             'h': defaultButtonHeight,
@@ -266,7 +363,7 @@ function init(obj) {
         let cx = stage.x + stage.canvas.width;
         let textX = text.x + text.getMeasuredWidth();
         if(cx < textX){
-            text.x -= textX - cx + DEFAULT_HORIZONTAL_MARGIN;
+            text.x -= textX - cx + defaultHorizontalMargin;
         }
 
         if(arg.textAlign != null){
@@ -314,10 +411,16 @@ function init(obj) {
      * @param {int} roundHeight 角丸の高さ
      * @param {string} fillColor 図形内の塗りつぶし色
      * @param {string} lineColor 図形の枠線の色
+     * @param {obj} addShpaeObj 追加する図形オブジェクト
+     * @param {boolean} isPopEvent ポップアップイベントの有無
+     * @param {obj} popEventProperty ポップアップイベントのプロパティ
      * @return {obj} 四角形（角丸）オブジェクト
      * 
     */
    function drawRoundRect(arg){
+    
+    let roundRectContainer = new createjs.Container();
+
     let roundRect = new createjs.Shape();
 
     roundRect.graphics.beginStroke(arg.lineColor)
@@ -326,7 +429,18 @@ function init(obj) {
                 .drawRoundRect(arg.x, arg.y, arg.w, arg.h, arg.roundWidth, arg.roundHeight)
                 .endStroke();
 
-    return roundRect;
+    roundRectContainer.addChild(roundRect);
+
+    if(arg.addShpaeObj != null){
+        // 追加するオブジェクトがある場合
+        roundRectContainer.addChild(arg.addShpaeObj);
+    }
+
+    if(isPopEvent){
+        
+    }
+
+    return roundRectContainer;
     }
 
     /** 吹き出しを生成
@@ -345,6 +459,7 @@ function init(obj) {
      * @param {int} roundHeight 角丸の高さ
      * @param {string} fillColor 図形内の塗りつぶし色
      * @param {string} lineColor 図形の枠線の色
+     * @param {obj} addShpaeObj 追加する図形オブジェクト
      * @return {obj} 吹き出しオブジェクト
      * 
     */
@@ -352,24 +467,29 @@ function init(obj) {
     let speechBalloons = new createjs.Shape();
 
     speechBalloons.graphics
-                .beginStroke(arg.get('lineColor') == null ? defaultLineColor : arg.get('lineColor'))
-                .setStrokeStyle(arg.get('lineWidth') == null ? defaultLineWidth : arg.get('lineWidth'))
-                .beginFill(arg.get('fillColor') == null ? defaultFillColor : arg.get('fillColor'))
-                .drawRoundRect(arg.get('x'), arg.get('y'), arg.get('w'), arg.get('h'), arg.get('roundWidth'), arg.get('roundHeight'));
+                .beginStroke(arg.lineColor)
+                .setStrokeStyle(arg.lineWidth)
+                .beginFill(arg.fillColor)
+                .drawRoundRect(arg.x, arg.y, arg.w, arg.h, arg.roundWidth, arg.roundHeight);
 
     // 吹き出し口を生成
-    let bx = (x < balloonsFromX && balloonsFromX < x + width) ? balloonsFromX - balloonsWidth : balloonsFromX;
-    let by = (y < balloonsFromY && balloonsFromY < y + height) ? balloonsFromY - balloonsWidth : balloonsFromY;
-    let bxx = (x < balloonsFromX && balloonsFromX < x + width) ? balloonsFromX + balloonsWidth : balloonsFromX;
-    let byy = (y < balloonsFromY && balloonsFromY < y + height) ? balloonsFromY + balloonsWidth : balloonsFromY;
+    let bx = (arg.x < arg.balloonsFromX && arg.balloonsFromX < arg.x + arg.w) ? arg.balloonsFromX - arg.balloonsWidth/2 : arg.balloonsFromX;
+    let by = (arg.y < arg.balloonsFromY && arg.balloonsFromY < arg.y + arg.h) ? arg.balloonsFromY - arg.balloonsWidth/2 : arg.balloonsFromY;
+    let bxx = (arg.x < arg.balloonsFromX && arg.balloonsFromX < arg.x + arg.w) ? arg.balloonsFromX + arg.balloonsWidth/2 : arg.balloonsFromX;
+    let byy = (arg.y < arg.balloonsFromY && arg.balloonsFromY < arg.y + arg.h) ? arg.balloonsFromY + arg.balloonsWidth/2 : arg.balloonsFromY;
 
     speechBalloons.graphics
                         .moveTo(bx, by)
-                        .lineTo(balloonsToX, balloonsToY)
-                        .lineTo(bxx, byy)
-                        .beginStroke(arg.get('fillColor') == null ? defaultFillColor : arg.get('fillColor'))
+                        .lineTo(arg.balloonsToX, arg.balloonsToY) // 左辺
+                        .lineTo(bxx, byy) // 右辺
+
+    speechBalloons.graphics
+                        .beginStroke(arg.fillColor)
+                        .setStrokeStyle(arg.lineWidth + 1.5)
+                        .moveTo(bxx, byy)
                         .lineTo(bx, by)
                         .endStroke();
+    console.log(arg.fillColor)
 
     return speechBalloons;
     }
@@ -412,7 +532,8 @@ function init(obj) {
                         .drawRoundRect(0, 0, arg.w, arg.h, arg.roundWidth, arg.roundHeight)
                         .endStroke();
         normalContainer.addChild(normalBtn);
-        // normalContainer.addChild(arg.normalInsideObj);
+        normalContainer.addChild(arg.normalInsideObj);
+        
         normalContainer.visible = true;
 
         buttonContainer.addChild(normalContainer);
@@ -461,13 +582,71 @@ function init(obj) {
         return buttonContainer;
     }
 
-    /** イベント付図形を生成
+    // ------------------------------------------------
+    // 任意の図形を表示
+    // ------------------------------------------------
+
+    /** ペンマークを生成
      * 
-     * @param {obj} baseShape イベント対象図形
-     * @param {obj} eventObj イベントオブジェクト
+     * @param {int} x x座標（ペン元）
+     * @param {int} y y座標（ペン元）
+     * @param {int} w ペン幅
+     * @param {int} h ペン高さ
+     * @param {int} lineColor ペン外枠カラー
+     * @param {int} lineWidth ペン外枠幅
+     * @param {int} bodyHeight ペン本体高さ
+     * @param {string} bodyColor 本体カラー
+     * @param {string} edgeColor 先端カラー
+     * @return {obj} ペンマークオブジェクト
      * 
      */
-    function shapeWithEvent(arg){
+    function drawPen(arg){
+        let penContainer = new createjs.Container();
 
+        // ペン本体部分
+        let penBodyShape = new createjs.Shape();
+        penBodyShape.graphics
+                        .setStrokeStyle(arg.lineWidth)
+                        .beginStroke(arg.lineColor)
+                        .beginFill(arg.bodyColor)
+                        .moveTo(arg.x - arg.w/2, arg.y)
+                        .lineTo(arg.x - arg.w/2, arg.y - arg.bodyHeight) // 左辺
+                        .lineTo(arg.x + arg.w/2, arg.y - arg.bodyHeight) // 上辺
+                        .lineTo(arg.x + arg.w/2, arg.y) // 右辺
+                        .lineTo(arg.x - arg.w/2, arg.y) // 下辺
+                        .endStroke();
+
+        penContainer.addChild(penBodyShape);
+
+        // ペン先端部分
+        let penEdgeShape = new createjs.Shape();
+        penEdgeShape.graphics
+                        .setStrokeStyle(arg.lineWidth)
+                        .beginStroke(arg.lineColor)
+                        .beginFill(arg.edgeColor)
+                        .moveTo(arg.x - arg.w/2, arg.y - arg.bodyHeight)
+                        .lineTo(arg.x, arg.y - arg.h) // 左辺
+                        .lineTo(arg.x + arg.w/2, arg.y - arg.bodyHeight) // 右辺
+                        .endStroke();
+
+        penContainer.addChild(penEdgeShape);
+
+        return penContainer;
+    }
+
+    // ------------------------------------------------
+    // 共通関数
+    // ------------------------------------------------
+    
+    /** ポップアップ処理
+     * 
+     */
+    function popUp(obj){
+        if(popContainer == null){
+            popContainer = obj;
+            stage.addChild(popContainer);
+        }else{
+            popContainer = obj;
+        }   
     }
   }
